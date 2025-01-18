@@ -1,29 +1,14 @@
-import { StatusBar } from "expo-status-bar";
-import { Button, StyleSheet, Text, View } from "react-native";
+import { Platform } from "react-native";
+
+import AndroidApp from "./Components/AndroidPlatform/PlatformSpecificApp.android";
+import WebApp from "./Components/WebPlatform/PlatformSpecificApp.web";
+
+const PlatformSpecificApp = Platform.select({
+  android: AndroidApp,
+  web: WebApp,
+  default: WebApp,
+});
 
 export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text
-        style={{ margin: 16, borderWidth: 2, borderColor: "red", padding: 16 }}
-      >
-        Click that button below
-      </Text>
-      <Button
-        title="Click Me!"
-        color="#841584"
-        accessibilityLabel="Learn more about this purple button"
-      />
-      <StatusBar style="auto" />
-    </View>
-  );
+  return <PlatformSpecificApp />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#A2E9C1",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
