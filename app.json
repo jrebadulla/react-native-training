@@ -1,28 +1,39 @@
 {
   "expo": {
-    "name": "RNCourse",
+    "name": "Svcc Books",
     "slug": "RNCourse",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#6D2323"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.jrebadulla.rncourse",
+      "versionCode": 2,
+      "minSdkVersion": 21,
+      "targetSdkVersion": 34,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": []
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e74be76c-706a-424f-b02a-3e755d739077"
+      }
     }
   }
 }
