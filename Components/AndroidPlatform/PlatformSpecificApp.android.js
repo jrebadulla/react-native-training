@@ -12,11 +12,13 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  Image,
 } from "react-native";
 import { db, collection, getDocs } from "./firebase";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { debounce } from "lodash";
 import { Animated } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function PlatformSpecificApp() {
   const [books, setBooks] = useState(() => []);
@@ -87,8 +89,10 @@ export default function PlatformSpecificApp() {
       setLoading(true);
       const lowerCaseQuery = query.toLowerCase().trim();
       setFilteredBooks(
-        books.filter((book) =>
-          book.title?.toLowerCase().includes(lowerCaseQuery)
+        books.filter(
+          (book) =>
+            book.title?.toLowerCase().includes(lowerCaseQuery) ||
+            book.author?.toLowerCase().includes(lowerCaseQuery)
         )
       );
       setLoading(false);
@@ -118,11 +122,11 @@ export default function PlatformSpecificApp() {
   }, [books]);
 
   return (
-    <View style={styles.appContainer}>
+    <LinearGradient colors={["#6D2323", "#FEF9E1"]} style={styles.appContainer}>
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.textInput, styles.textInputWithIcon]}
-          placeholder="Search for a book here..."
+          placeholder="Search book title or author here..."
           value={searchQuery}
           onChangeText={handleSearchChange}
         />
@@ -152,13 +156,20 @@ export default function PlatformSpecificApp() {
             style={styles.searchIcon}
           />
         )}
+        <Image source={require("../../assets/read.png")} style={styles.logo} />
       </View>
 
       <Text style={styles.searchTitle}>Books:</Text>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {searchQuery ? (
           filteredBooks.length === 0 ? (
-            <Text style={styles.noResults}>No Books found.</Text>
+            <View>
+              <Text style={styles.noResults}>No Books Found</Text>
+              <Image
+                source={require("../../assets/noData.png")}
+                style={styles.noData}
+              />
+            </View>
           ) : (
             Object.entries(
               filteredBooks.reduce((groups, book) => {
@@ -170,8 +181,14 @@ export default function PlatformSpecificApp() {
                 return groups;
               }, {})
             ).map(([shelfLocation, booksOnShelf]) => (
-              <View key={shelfLocation} style={styles.shelfContainer}>
-                <Text style={styles.shelfTitle}>Shelf {shelfLocation}</Text>
+              <LinearGradient
+                key={shelfLocation}
+                colors={["#551313", "#f3e5df"]}
+                style={styles.shelfContainer}
+              >
+                <Text style={styles.shelfTitle}>
+                  SHELF LOCATION NUMBER {shelfLocation}
+                </Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -179,6 +196,80 @@ export default function PlatformSpecificApp() {
                 >
                   {booksOnShelf.map((book) => (
                     <TouchableOpacity key={book.id} style={styles.bookCard}>
+                      <LinearGradient
+                        colors={["#681313", "hsl(40, 73%, 80%)"]}
+                        style={styles.bookCardBackground}
+                      >
+                        <View
+                          style={[
+                            styles.ribbon,
+                            {
+                              backgroundColor:
+                                book.copiesAvailable > 0
+                                  ? "#28a745"
+                                  : "#dc3545",
+                            },
+                          ]}
+                        >
+                          <Text style={styles.ribbonText}>
+                            {book.copiesAvailable > 0
+                              ? "Available"
+                              : "Unavailable"}
+                          </Text>
+                        </View>
+                        <View style={styles.bookCover}>
+                          <Text style={styles.bookTitle}>
+                            {book.title || "Untitled"}
+                          </Text>
+                          <Text style={styles.bookAuthor}>
+                            {book.author
+                              ? `by ${book.author.trim()}`
+                              : "Unknown Author"}
+                          </Text>
+                        </View>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </LinearGradient>
+            ))
+          )
+        ) : (
+          Object.keys(groupedBooks).map((shelfLocation) => (
+            <LinearGradient
+              key={shelfLocation}
+              colors={["#551313", "#f3e5df"]}
+              style={styles.shelfContainer}
+            >
+              <Text style={styles.shelfTitle}>
+                SHELF LOCATION NUMBER {shelfLocation}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.shelfRow}
+              >
+                {groupedBooks[shelfLocation].map((book) => (
+                  <TouchableOpacity key={book.id} style={styles.bookCard}>
+                    <LinearGradient
+                      colors={["#681313", "hsl(40, 73%, 80%)"]}
+                      style={styles.bookCardBackground}
+                    >
+                      <View
+                        style={[
+                          styles.ribbon,
+                          {
+                            backgroundColor:
+                              book.copiesAvailable > 0 ? "#28a745" : "#dc3545",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.ribbonText}>
+                          {book.copiesAvailable > 0
+                            ? "Available"
+                            : "Unavailable"}
+                        </Text>
+                      </View>
                       <View style={styles.bookCover}>
                         <Text style={styles.bookTitle}>
                           {book.title || "Untitled"}
@@ -189,41 +280,15 @@ export default function PlatformSpecificApp() {
                             : "Unknown Author"}
                         </Text>
                       </View>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            ))
-          )
-        ) : (
-          Object.keys(groupedBooks).map((shelfLocation) => (
-            <View key={shelfLocation} style={styles.shelfContainer}>
-              <Text style={styles.shelfTitle}>SHELF LOCATION NUMBER {shelfLocation}</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.shelfRow}
-              >
-                {groupedBooks[shelfLocation].map((book) => (
-                  <TouchableOpacity key={book.id} style={styles.bookCard}>
-                    <View style={styles.bookCover}>
-                      <Text style={styles.bookTitle}>
-                        {book.title || "Untitled"}
-                      </Text>
-                      <Text style={styles.bookAuthor}>
-                        {book.author
-                          ? `by ${book.author.trim()}`
-                          : "Unknown Author"}
-                      </Text>
-                    </View>
+                    </LinearGradient>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
+            </LinearGradient>
           ))
         )}
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -249,27 +314,35 @@ const styles = StyleSheet.create({
   },
   searchTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "bold",
     color: "#FEF9E1",
     marginBottom: 10,
   },
   shelfContainer: {
     marginBottom: 30,
-    padding: 10,
-    backgroundColor: "#FEF9E1",
+    padding: 20,
     borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 4,
+    shadowColor: "rgba(0, 0, 0, 0.5)",
+    shadowOffset: { width: 0, height: 0 },
+    backgroundColor: "#FEF9E1",
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    transformStyle: "preserve-3d",
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: "transparent",
+    overflow: "hidden",
+    backgroundClip: "padding-box",
   },
   shelfTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#444",
+    color: "#FEF9E1",
     marginBottom: 10,
     textAlign: "center",
+    textShadowColor: "#FEF9E1",
+    top: -10,
+    textShadowRadius: 10,
   },
   scrollContainer: {
     paddingBottom: 20,
@@ -280,17 +353,17 @@ const styles = StyleSheet.create({
   },
   bookCard: {
     backgroundColor: "#FEF9E1",
-    padding: 20,
     marginVertical: 10,
     marginRight: 15,
     borderRadius: 15,
-    shadowColor: "rgba(0, 0, 0, 0.2)",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowColor: "rgba(0, 0, 0, 0.3)",
+    shadowOffset: { width: 5, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
     elevation: 6,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "transparent",
+    position: "relative",
   },
   bookCover: {
     width: 100,
@@ -299,32 +372,33 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     justifyContent: "center",
     alignItems: "center",
-    padding: 10,
+    padding: 15,
   },
   bookTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
-    color: "#6D2323",
+    color: "#FEF9E1",
     textAlign: "center",
     marginBottom: 5,
   },
   bookAuthor: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "300",
-    color: "#34495e",
+    color: "#6D2323",
     textAlign: "center",
   },
   clearButton: {
     position: "absolute",
-    right: 10,
+    right: 30,
     top: 5,
-    padding: 5,
+    padding: 7,
   },
   noResults: {
     fontSize: 16,
     color: "#FEF9E1",
     textAlign: "center",
     marginTop: 20,
+    right:30
   },
   searchIcon: {
     position: "absolute",
@@ -340,5 +414,56 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 10,
     top: 14,
+  },
+
+  bookCardBackground: {
+    borderRadius: 15,
+    shadowColor: "rgba(0, 0, 0, 0.2)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 0.5,
+    borderColor: "#ddd",
+  },
+  logo: {
+    position: "absolute",
+    right: 10,
+    top: 12,
+    width: 28,
+    height: 28,
+  },
+  noData: {
+    position: "absolute",
+    left: 330,
+    top: 0,
+    width: 48,
+    height: 48,
+  },
+
+  ribbon: {
+    position: "absolute",
+    top: 24,
+    left: 60,
+    width: 70,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    transform: [{ rotate: "-90deg" }],
+    zIndex: 1,
+    borderTopLeftRadius: 20,
+    borderBottomRightRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  ribbonText: {
+    fontSize: 8,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
+    textTransform: "uppercase",
   },
 });
