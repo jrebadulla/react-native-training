@@ -62,26 +62,26 @@ export default function PlatformSpecificApp() {
     }
   }, [loading]);
 
+  const fetchBooks = async () => {
+    setLoading(true);
+    startLoadingAnimation();
+    try {
+      const querySnapshot = await getDocs(collection(db, "books"));
+      const booksList = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setBooks(booksList);
+      setFilteredBooks(booksList);
+    } catch (error) {
+      console.error("Error fetching books:", error);
+    }
+    setLoading(false);
+    stopLoadingAnimation();
+  };
+
   useEffect(() => {
-    let isMounted = true;
-    const fetchBooks = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "books"));
-        if (!isMounted) return;
-        const booksList = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setBooks(booksList);
-        setFilteredBooks(booksList);
-      } catch (error) {
-        console.error("Error fetching books:", error);
-      }
-    };
     fetchBooks();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   const debouncedSearch = useCallback(
@@ -110,6 +110,10 @@ export default function PlatformSpecificApp() {
     setFilteredBooks(books);
   };
 
+  const handleRefresh = () => {
+    fetchBooks();
+  };
+
   const groupedBooks = useMemo(() => {
     return books.reduce((groups, book) => {
       const shelf = book.shelfLocation || "Unknown";
@@ -120,6 +124,20 @@ export default function PlatformSpecificApp() {
       return groups;
     }, {});
   }, [books]);
+
+  const startLoadingAnimation = () => {
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+  };
+
+  const stopLoadingAnimation = () => {
+    spinValue.stopAnimation();
+  };
 
   return (
     <LinearGradient colors={["#6D2323", "#FEF9E1"]} style={styles.appContainer}>
@@ -156,10 +174,21 @@ export default function PlatformSpecificApp() {
             style={styles.searchIcon}
           />
         )}
+
         <Image source={require("../../assets/read.png")} style={styles.logo} />
       </View>
-
-      <Text style={styles.searchTitle}>Books:</Text>
+      <View>
+        <Text style={styles.searchTitle}>Books:</Text>
+        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+          {loading ? (
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <Icon name="autorenew" size={28} color="#FEF9E1" />
+            </Animated.View>
+          ) : (
+            <Icon name="refresh" size={28} color="#FEF9E1" />
+          )}
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {searchQuery ? (
           filteredBooks.length === 0 ? (
@@ -398,7 +427,7 @@ const styles = StyleSheet.create({
     color: "#FEF9E1",
     textAlign: "center",
     marginTop: 20,
-    right:30
+    right: 30,
   },
   searchIcon: {
     position: "absolute",
@@ -465,5 +494,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
     textTransform: "uppercase",
+  },
+  refreshButton: {
+    position: "absolute",
+    left: 70,
+    top: -1,
   },
 });
