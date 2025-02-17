@@ -19,7 +19,6 @@ import Icon from "react-native-vector-icons/MaterialIcons";
 import { debounce } from "lodash";
 import { Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useWindowDimensions } from "react-native";
 
 export default function PlatformSpecificApp() {
   const [books, setBooks] = useState(() => []);
@@ -27,9 +26,11 @@ export default function PlatformSpecificApp() {
   const [filteredBooks, setFilteredBooks] = useState(() => []);
   const [loading, setLoading] = useState(false);
   const spinValue = useRef(new Animated.Value(0)).current;
+
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height; 
   const loopAnimation = useRef(null);
+
 
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function PlatformSpecificApp() {
     outputRange: ["0deg", "360deg"],
   });
 
+  const loopAnimation = useRef(null);
   useEffect(() => {
     if (loading) {
       loopAnimation.current = Animated.loop(
@@ -66,10 +68,8 @@ export default function PlatformSpecificApp() {
       loopAnimation.current.start();
     } else {
       loopAnimation.current?.stop();
-      spinValue.setValue(0); // Reset animation to avoid getting stuck mid-spin
     }
   }, [loading]);
-  
 
   const fetchBooks = async () => {
     setLoading(true);
@@ -93,40 +93,25 @@ export default function PlatformSpecificApp() {
     fetchBooks();
   }, []);
 
-const debouncedSearch = useCallback(
-  debounce((query) => {
-    setSearchLoading(true);
-    const lowerCaseQuery = query.toLowerCase().trim();
-    setFilteredBooks(
-      books.filter(
-        (book) =>
-          book.title?.toLowerCase().includes(lowerCaseQuery) ||
-          book.author?.toLowerCase().includes(lowerCaseQuery)
-      )
-    );
-    setSearchLoading(false);
-  }, 200),
-  [books]
-);
-
+  const debouncedSearch = useCallback(
+    debounce((query) => {
+      setLoading(true);
+      const lowerCaseQuery = query.toLowerCase().trim();
+      setFilteredBooks(
+        books.filter(
+          (book) =>
+            book.title?.toLowerCase().includes(lowerCaseQuery) ||
+            book.author?.toLowerCase().includes(lowerCaseQuery)
+        )
+      );
+      setLoading(false);
+    }, 200),
+    [books]
+  );
 
   const handleSearchChange = (text) => {
     setSearchQuery(text);
-
-    if (text.trim() === "") {
-      setFilteredBooks(books);
-      return;
-    }
-
-    const lowerCaseQuery = text.toLowerCase().trim();
-
-    const filtered = books.filter(
-      (book) =>
-        book.title?.toLowerCase().includes(lowerCaseQuery) ||
-        book.author?.toLowerCase().includes(lowerCaseQuery)
-    );
-
-    setFilteredBooks(filtered);
+    debouncedSearch(text);
   };
 
   const handleClearSearch = () => {
@@ -135,29 +120,19 @@ const debouncedSearch = useCallback(
   };
 
   const handleRefresh = () => {
-    setLoading(true);
-    fetchBooks().then(() => setLoading(false));
+    fetchBooks();
   };
-  
 
   const groupedBooks = useMemo(() => {
-    const sourceBooks = searchQuery ? filteredBooks : books;
-
-    return sourceBooks.reduce((groups, book) => {
+    return books.reduce((groups, book) => {
       const shelf = book.shelfLocation || "Unknown";
-      const layer = book.layerNumber || "Unknown Layer Number";
-
       if (!groups[shelf]) {
-        groups[shelf] = {};
+        groups[shelf] = [];
       }
-      if (!groups[shelf][layer]) {
-        groups[shelf][layer] = [];
-      }
-      groups[shelf][layer].push(book);
-
+      groups[shelf].push(book);
       return groups;
     }, {});
-  }, [filteredBooks, books, searchQuery]);
+  }, [books]);
 
   const startLoadingAnimation = () => {
     loopAnimation.current = Animated.loop(
@@ -192,7 +167,7 @@ const debouncedSearch = useCallback(
             <Icon
               name="autorenew"
               size={24}
-              color="transparent"
+              color="#6D2323"
               style={styles.searchIcon}
             />
           </Animated.View>
@@ -227,26 +202,40 @@ const debouncedSearch = useCallback(
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {Object.keys(groupedBooks).map((shelfLocation) => (
-          <LinearGradient
-            key={shelfLocation}
-            colors={["#551313", "#f3e5df"]}
-            style={styles.shelfContainer}
-          >
-            <Text style={styles.shelfTitle}>
-              SHELF LOCATION NUMBER {shelfLocation}
-            </Text>
-
-            {Object.keys(groupedBooks[shelfLocation]).map((layer) => (
-              <View key={layer} style={styles.layerContainer}>
-                <Text style={styles.layerTitle}>Layer {layer}</Text>
-
+        {searchQuery ? (
+          filteredBooks.length === 0 ? (
+            <View>
+              <Text style={styles.noResults}>No Books Found</Text>
+              <Image
+                source={require("../../assets/noData.png")}
+                style={styles.noData}
+              />
+            </View>
+          ) : (
+            Object.entries(
+              filteredBooks.reduce((groups, book) => {
+                const shelf = book.shelfLocation || "Unknown";
+                if (!groups[shelf]) {
+                  groups[shelf] = [];
+                }
+                groups[shelf].push(book);
+                return groups;
+              }, {})
+            ).map(([shelfLocation, booksOnShelf]) => (
+              <LinearGradient
+                key={shelfLocation}
+                colors={["#551313", "#f3e5df"]}
+                style={styles.shelfContainer}
+              >
+                <Text style={styles.shelfTitle}>
+                  SHELF LOCATION NUMBER {shelfLocation}
+                </Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.shelfRow}
                 >
-                  {groupedBooks[shelfLocation][layer].map((book) => (
+                  {booksOnShelf.map((book) => (
                     <TouchableOpacity key={book.id} style={styles.bookCard}>
                       <LinearGradient
                         colors={["#681313", "hsl(40, 73%, 80%)"]}
@@ -279,19 +268,66 @@ const debouncedSearch = useCallback(
                               : "Unknown Author"}
                           </Text>
                         </View>
-                        <View style={styles.copiesAvailableBadge}>
-                          <Text style={styles.copiesAvailableText}>
-                            {book.copiesAvailable} Copies
-                          </Text>
-                        </View>
                       </LinearGradient>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-              </View>
-            ))}
-          </LinearGradient>
-        ))}
+              </LinearGradient>
+            ))
+          )
+        ) : (
+          Object.keys(groupedBooks).map((shelfLocation) => (
+            <LinearGradient
+              key={shelfLocation}
+              colors={["#551313", "#f3e5df"]}
+              style={styles.shelfContainer}
+            >
+              <Text style={styles.shelfTitle}>
+                SHELF LOCATION NUMBER {shelfLocation}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.shelfRow}
+              >
+                {groupedBooks[shelfLocation].map((book) => (
+                  <TouchableOpacity key={book.id} style={styles.bookCard}>
+                    <LinearGradient
+                      colors={["#681313", "hsl(40, 73%, 80%)"]}
+                      style={styles.bookCardBackground}
+                    >
+                      <View
+                        style={[
+                          styles.ribbon,
+                          {
+                            backgroundColor:
+                              book.copiesAvailable > 0 ? "#28a745" : "#dc3545",
+                          },
+                        ]}
+                      >
+                        <Text style={styles.ribbonText}>
+                          {book.copiesAvailable > 0
+                            ? "Available"
+                            : "Unavailable"}
+                        </Text>
+                      </View>
+                      <View style={styles.bookCover}>
+                        <Text style={styles.bookTitle}>
+                          {book.title || "Untitled"}
+                        </Text>
+                        <Text style={styles.bookAuthor}>
+                          {book.author
+                            ? `by ${book.author.trim()}`
+                            : "Unknown Author"}
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </LinearGradient>
+          ))
+        )}
       </ScrollView>
     </LinearGradient>
   );
@@ -321,7 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     color: "#FEF9E1",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   shelfContainer: {
     marginBottom: 30,
@@ -371,8 +407,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   bookCover: {
-    width: 120,
-    height: 170,
+    width: 100,
+    height: 150,
     borderRadius: 5,
     marginBottom: 10,
     justifyContent: "center",
@@ -449,7 +485,7 @@ const styles = StyleSheet.create({
   ribbon: {
     position: "absolute",
     top: 24,
-    left: 80,
+    left: 60,
     width: 70,
     height: 20,
     justifyContent: "center",
@@ -475,38 +511,5 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 70,
     top: -1,
-  },
-  layerContainer: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: "#6D2323",
-    borderRadius: 8,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 1, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  layerTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#fff",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  copiesAvailableBadge: {
-    position: "absolute",
-    left: 5,
-    bottom: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2,
-  },
-  copiesAvailableText: {
-    fontSize: 10,
-    color: "#6D2323",
   },
 });
