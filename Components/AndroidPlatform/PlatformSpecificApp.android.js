@@ -27,19 +27,28 @@ export default function PlatformSpecificApp() {
   const [loading, setLoading] = useState(false);
   const spinValue = useRef(new Animated.Value(0)).current;
 
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height; 
+  const loopAnimation = useRef(null);
+
+
+
   useEffect(() => {
     if (loading) {
-      Animated.loop(
+      loopAnimation.current = Animated.loop(
         Animated.timing(spinValue, {
           toValue: 1,
           duration: 1000,
           useNativeDriver: true,
         })
-      ).start();
+      );
+      loopAnimation.current.start();
     } else {
-      spinValue.stopAnimation();
+      loopAnimation.current?.stop();
+      spinValue.setValue(0); // Reset animation
     }
   }, [loading]);
+  
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
@@ -126,18 +135,21 @@ export default function PlatformSpecificApp() {
   }, [books]);
 
   const startLoadingAnimation = () => {
-    Animated.loop(
+    loopAnimation.current = Animated.loop(
       Animated.timing(spinValue, {
         toValue: 1,
         duration: 1000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    loopAnimation.current.start();
   };
 
   const stopLoadingAnimation = () => {
-    spinValue.stopAnimation();
+    loopAnimation.current?.stop();
+    spinValue.setValue(0);
   };
+  
 
   return (
     <LinearGradient colors={["#6D2323", "#FEF9E1"]} style={styles.appContainer}>
