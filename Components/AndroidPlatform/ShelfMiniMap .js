@@ -203,7 +203,7 @@ const ShelfMiniMap = () => {
                                   </Text>
                                   <View style={styles.copiesContainer}>
                                     <Text style={styles.copiesText}>
-                                      {item.copiesAvailable} 
+                                      {item.copiesAvailable}
                                     </Text>
                                   </View>
                                 </View>
