@@ -9,23 +9,26 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~4.0.0",
-    "expo": "~52.0.25",
-    "expo-splash-screen": "^0.29.21",
+    "@expo/metro-runtime": "4.0.1",
+    "@react-native-firebase/app": "^21.10.1",
+    "@react-native-firebase/firestore": "^21.10.1",
+    "expo": "52.0.35",
+    "expo-linear-gradient": "~14.0.2",
+    "expo-splash-screen": "0.29.22",
     "expo-status-bar": "~2.0.1",
     "firebase": "^11.2.0",
     "lottie-react-native": "7.1.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-native": "0.76.6",
+    "react-native": "0.76.7",
     "react-native-config": "^1.5.3",
-    "react-native-gesture-handler": "^2.22.0",
+    "react-native-fast-image": "^8.6.3",
+    "react-native-gesture-handler": "2.20.2",
     "react-native-linear-gradient": "^2.8.3",
     "react-native-reanimated": "^3.16.7",
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.2.0",
-    "react-native-web": "~0.19.13",
-    "expo-linear-gradient": "~14.0.2"
+    "react-native-web": "~0.19.13"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
