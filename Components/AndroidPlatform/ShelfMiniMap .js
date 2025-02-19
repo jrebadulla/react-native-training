@@ -43,6 +43,8 @@ const ShelfMiniMap = () => {
   const [highlightedShelf, setHighlightedShelf] = useState(null);
   const [highlightedLayer, setHighlightedLayer] = useState(null);
   const [highlightedBookId, setHighlightedBookId] = useState(null);
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [bookModalVisible, setBookModalVisible] = useState(false);
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
@@ -173,41 +175,47 @@ const ShelfMiniMap = () => {
                       ([layer, books]) => (
                         <View key={layer} style={styles.layerContainer}>
                           <Text style={styles.layerTitle}>Layer {layer}</Text>
-
                           <FlatList
                             data={books}
                             horizontal
                             keyExtractor={(item) => item.id}
                             renderItem={({ item }) => (
-                              <View
-                                style={[
-                                  styles.bookContainer,
-                                  item.id === highlightedBookId &&
-                                    styles.highlightedBookContainer,
-                                ]}
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setSelectedBook(item);
+                                  setBookModalVisible(true);
+                                }}
                               >
-                                {item.id === highlightedBookId && (
-                                  <Text style={styles.bookArrow}>👇</Text>
-                                )}
-
                                 <View
                                   style={[
-                                    styles.bookSpine,
-                                    { backgroundColor: item.color },
+                                    styles.bookContainer,
                                     item.id === highlightedBookId &&
-                                      styles.highlightedBookSpine,
+                                      styles.highlightedBookContainer,
                                   ]}
                                 >
-                                  <Text style={styles.bookTitle}>
-                                    {item.title}
-                                  </Text>
-                                  <View style={styles.copiesContainer}>
-                                    <Text style={styles.copiesText}>
-                                      {item.copiesAvailable}
+                                  {item.id === highlightedBookId && (
+                                    <Text style={styles.bookArrow}>👇</Text>
+                                  )}
+
+                                  <View
+                                    style={[
+                                      styles.bookSpine,
+                                      { backgroundColor: item.color },
+                                      item.id === highlightedBookId &&
+                                        styles.highlightedBookSpine,
+                                    ]}
+                                  >
+                                    <Text style={styles.bookTitle}>
+                                      {item.title}
                                     </Text>
+                                    <View style={styles.copiesContainer}>
+                                      <Text style={styles.copiesText}>
+                                        {item.copiesAvailable}
+                                      </Text>
+                                    </View>
                                   </View>
                                 </View>
-                              </View>
+                              </TouchableOpacity>
                             )}
                             showsHorizontalScrollIndicator={false}
                           />
@@ -219,6 +227,106 @@ const ShelfMiniMap = () => {
                   <TouchableOpacity
                     style={styles.closeButton}
                     onPress={() => setModalVisible(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+            {/* Book Info Modal */}
+            {/* Book Info Modal */}
+            <Modal
+              visible={bookModalVisible}
+              animationType="fade"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.bookInfoModal}>
+                  <Text style={styles.modalTitle}>📖 Book Details</Text>
+
+                  {selectedBook && (
+                    <ScrollView style={styles.bookDetailsContainer}>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Title: </Text>
+                        <Text style={styles.value}>{selectedBook.title}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Author: </Text>
+                        <Text style={styles.value}>{selectedBook.author}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Description: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.bookDescription}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Category: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.category}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}> Publisher:</Text>
+                        <Text style={styles.value}>
+                          {selectedBook.publisher}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Year: </Text>
+                        <Text style={styles.value}>{selectedBook.year}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>ISBN: </Text>
+                        <Text style={styles.value}>{selectedBook.isbn}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Total Copies: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.totalCopies}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Available Copies: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.copiesAvailable}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Shelf: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.shelfLocation}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Layer: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.layerNumber}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Department: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.department.join(", ")}
+                        </Text>
+                      </View>
+                    </ScrollView>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setBookModalVisible(false)}
                   >
                     <Text style={styles.closeButtonText}>Close</Text>
                   </TouchableOpacity>
@@ -340,7 +448,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 5,
-    color: "#333",
+    color: "#fff",
   },
 
   bookSpine: {
@@ -421,6 +529,84 @@ const styles = StyleSheet.create({
   copiesText: {
     color: "white",
     fontSize: 10,
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+
+  bookInfoModal: {
+    width: "85%",
+    height: "75%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 15,
+    borderBottomWidth: 2,
+    borderBottomColor: "#d2691e",
+    paddingBottom: 5,
+    color: "#8B4513",
+  },
+
+  bookDetailsContainer: {
+    maxHeight: "75%",
+    paddingVertical: 10,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    backgroundColor: "#FAF3E0",
+    borderRadius: 10,
+    shadowColor: "#8B4513",
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+
+  label: {
+    fontWeight: "bold",
+    color: "#8B4513",
+    fontSize: 16,
+    width: 100,
+    textAlign: "left",
+  },
+
+  value: {
+    color: "#333",
+    fontSize: 16,
+    flex: 1,
+    flexWrap: "wrap",
+  },
+
+  closeButton: {
+    marginTop: 15,
+    backgroundColor: "#d9534f",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+
+  closeButtonText: {
+    color: "white",
+    fontSize: 16,
     fontWeight: "bold",
   },
 });
