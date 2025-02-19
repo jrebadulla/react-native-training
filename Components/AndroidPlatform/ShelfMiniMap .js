@@ -130,13 +130,16 @@ const ShelfMiniMap = () => {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView behavior="height" style={styles.container}>
         <View style={styles.inner}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search books..."
-            placeholderTextColor="#888"
-            value={searchTerm}
-            onChangeText={(text) => setSearchTerm(text)}
-          />
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="🔍 Search books..."
+              placeholderTextColor="#888"
+              value={searchTerm}
+              onChangeText={(text) => setSearchTerm(text)}
+            />
+          </View>
+
           <View style={styles.miniMapContainer}>
             {shelves.map((shelf) => (
               <TouchableOpacity
@@ -351,15 +354,29 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginVertical: 20,
   },
-  searchInput: {
+  searchContainer: {
     width: "100%",
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    marginBottom: 10,
-    fontSize: 16,
+    alignItems: "center",
+    marginBottom: 15,
   },
+
+  searchInput: {
+    width: "95%",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: "#d2691e",
+    borderRadius: 25, 
+    fontSize: 16,
+    backgroundColor: "#FAF3E0", 
+    shadowColor: "#000",
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    color: "#333",
+  },
+
   shelf: {
     position: "absolute",
     alignItems: "center",
