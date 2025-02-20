@@ -153,7 +153,7 @@ const ShelfMiniMap = () => {
           }
         }, 500);
       } else {
-      }
+      ``}
     }
   }, [highlightedBookId, books, modalVisible, selectedShelf]);
 
