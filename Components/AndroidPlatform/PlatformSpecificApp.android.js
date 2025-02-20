@@ -4,7 +4,7 @@ import { View, StyleSheet } from "react-native";
 
 export default function PlatformSpecificApp() {
   return (
-    <LinearGradient colors={["#6D2323", "#d4a373"]} style={styles.container}>
+    <LinearGradient colors={["#6D2323", "#6D2323"]} style={styles.container}>
       <View style={styles.centered}>
         <ShelfMiniMap />
       </View>
