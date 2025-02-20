@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase.js";
 import { collection, getDocs } from "firebase/firestore";
 import {
@@ -19,20 +19,20 @@ import {
 const { width, height } = Dimensions.get("window");
 
 const shelves = [
-  { id: "Outdated", top: "5%", left: "20%", width: "28%", height: "10%" },
-  { id: "1", top: "20%", left: "73%" },
-  { id: "2", top: "20%", left: "55%" },
-  { id: "3", top: "20%", left: "37%" },
-  { id: "4", top: "20%", left: "20%" },
-  { id: "5", top: "38%", left: "91%" },
-  { id: "6", top: "20%", left: "91%" },
-  { id: "7", top: "5%", left: "55%", width: "28%", height: "10%" },
-  { id: "8", top: "20%", left: "2%" },
-  { id: "9", top: "38%", left: "2%" },
-  { id: "10", top: "56%", left: "2%" },
-  { id: "11", top: "74%", left: "2%" },
-  { id: "12", top: "80%", left: "15%", width: "30%", height: "8%" },
-  { id: "13", top: "56%", left: "91%" },
+  { id: "Outdated", top: "9%", left: "20%", width: "31%", height: "8%" },
+  { id: "1", top: "20%", left: "72%", width: "15%" },
+  { id: "2", top: "20%", left: "54%", width: "15%" },
+  { id: "3", top: "20%", left: "36%", width: "15%" },
+  { id: "4", top: "20%", left: "19%", width: "15%" },
+  { id: "5", top: "38%", left: "89%", width: "15%" },
+  { id: "6", top: "20%", left: "89%", width: "15%" },
+  { id: "7", top: "9%", left: "55%", width: "31%", height: "8%" },
+  { id: "8", top: "20%", left: "2%", width: "15%" },
+  { id: "9", top: "38%", left: "2%", width: "15%" },
+  { id: "10", top: "56%", left: "2%", width: "15%" },
+  { id: "11", top: "74%", left: "2%", width: "15%" },
+  { id: "12", top: "81%", left: "20%", width: "35%", height: "8%" },
+  { id: "13", top: "56%", left: "89%", width: "15%" },
 ];
 
 const ShelfMiniMap = () => {
@@ -43,6 +43,10 @@ const ShelfMiniMap = () => {
   const [highlightedShelf, setHighlightedShelf] = useState(null);
   const [highlightedLayer, setHighlightedLayer] = useState(null);
   const [highlightedBookId, setHighlightedBookId] = useState(null);
+  const [selectedBook, setSelectedBook] = useState(null);
+  const [bookModalVisible, setBookModalVisible] = useState(false);
+  const flatListRef = useRef(null);
+  const scrollViewRef = useRef(null);
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
@@ -70,11 +74,7 @@ const ShelfMiniMap = () => {
   const booksInShelf = (shelfId) => {
     const groupedBooks = {};
     books
-      .filter(
-        (book) =>
-          book.shelfLocation === shelfId &&
-          book.title.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      .filter((book) => book.shelfLocation === shelfId)
       .sort((a, b) => a.layerNumber - b.layerNumber)
       .forEach((book) => {
         if (!groupedBooks[book.layerNumber]) {
@@ -104,9 +104,7 @@ const ShelfMiniMap = () => {
         }));
 
         setBooks(booksData);
-      } catch (error) {
-        console.error("Error fetching books:", error);
-      }
+      } catch (error) {}
     };
     fetchBooks();
   }, []);
@@ -124,17 +122,72 @@ const ShelfMiniMap = () => {
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
+  useEffect(() => {
+    if (
+      highlightedBookId &&
+      flatListRef.current &&
+      books.length > 0 &&
+      modalVisible
+    ) {
+      const shelfBooks = books
+        .filter((book) => book.shelfLocation === selectedShelf)
+        .sort((a, b) => parseInt(a.layerNumber) - parseInt(b.layerNumber));
+
+      const index = shelfBooks.findIndex(
+        (book) => book.id === highlightedBookId
+      );
+
+      if (index !== -1 && index < shelfBooks.length) {
+        setTimeout(() => {
+          try {
+            flatListRef.current.scrollToIndex({
+              index,
+              animated: true,
+              viewPosition: 0.5,
+            });
+          } catch (error) {
+            flatListRef.current.scrollToOffset({
+              offset: index * 120,
+              animated: true,
+            });
+          }
+        }, 500);
+      } else {
+      ``}
+    }
+  }, [highlightedBookId, books, modalVisible, selectedShelf]);
+
+  useEffect(() => {
+    if (highlightedLayer && scrollViewRef.current) {
+      const layerIndex = Object.keys(booksInSelectedShelf).indexOf(
+        highlightedLayer.toString()
+      );
+
+      if (layerIndex !== -1) {
+        setTimeout(() => {
+          scrollViewRef.current.scrollTo({
+            y: layerIndex * 150,
+            animated: true,
+          });
+        }, 500);
+      }
+    }
+  }, [highlightedLayer, booksInSelectedShelf, modalVisible]);
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView behavior="height" style={styles.container}>
         <View style={styles.inner}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search books..."
-            placeholderTextColor="#888"
-            value={searchTerm}
-            onChangeText={(text) => setSearchTerm(text)}
-          />
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="🔍 Search books..."
+              placeholderTextColor="#888"
+              value={searchTerm}
+              onChangeText={(text) => setSearchTerm(text)}
+            />
+          </View>
+
           <View style={styles.miniMapContainer}>
             {shelves.map((shelf) => (
               <TouchableOpacity
@@ -157,6 +210,10 @@ const ShelfMiniMap = () => {
               </TouchableOpacity>
             ))}
 
+            <View style={styles.entrance}>
+              <Text style={styles.entranceText}>🚪Entrance</Text>
+            </View>
+
             <Modal
               visible={modalVisible}
               animationType="slide"
@@ -168,46 +225,64 @@ const ShelfMiniMap = () => {
                     Books in Shelf {selectedShelf}
                   </Text>
 
-                  <ScrollView style={styles.scrollView}>
+                  <ScrollView ref={scrollViewRef} style={styles.scrollView}>
                     {Object.entries(booksInSelectedShelf).map(
                       ([layer, books]) => (
                         <View key={layer} style={styles.layerContainer}>
                           <Text style={styles.layerTitle}>Layer {layer}</Text>
-
                           <FlatList
+                            ref={flatListRef}
                             data={books}
                             horizontal
                             keyExtractor={(item) => item.id}
+                            initialScrollIndex={
+                              highlightedBookId
+                                ? books.findIndex(
+                                    (book) => book.id === highlightedBookId
+                                  )
+                                : 0
+                            }
+                            getItemLayout={(data, index) => ({
+                              length: 120,
+                              offset: 120 * index,
+                              index,
+                            })}
                             renderItem={({ item }) => (
-                              <View
-                                style={[
-                                  styles.bookContainer,
-                                  item.id === highlightedBookId &&
-                                    styles.highlightedBookContainer,
-                                ]}
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setSelectedBook(item);
+                                  setBookModalVisible(true);
+                                }}
                               >
-                                {item.id === highlightedBookId && (
-                                  <Text style={styles.bookArrow}>👇</Text>
-                                )}
-
                                 <View
                                   style={[
-                                    styles.bookSpine,
-                                    { backgroundColor: item.color },
+                                    styles.bookContainer,
                                     item.id === highlightedBookId &&
-                                      styles.highlightedBookSpine,
+                                      styles.highlightedBookContainer,
                                   ]}
                                 >
-                                  <Text style={styles.bookTitle}>
-                                    {item.title}
-                                  </Text>
-                                  <View style={styles.copiesContainer}>
-                                    <Text style={styles.copiesText}>
-                                      {item.copiesAvailable}
+                                  {item.id === highlightedBookId && (
+                                    <Text style={styles.bookArrow}>👇</Text>
+                                  )}
+                                  <View
+                                    style={[
+                                      styles.bookSpine,
+                                      { backgroundColor: item.color },
+                                      item.id === highlightedBookId &&
+                                        styles.highlightedBookSpine,
+                                    ]}
+                                  >
+                                    <Text style={styles.bookTitle}>
+                                      {item.title}
                                     </Text>
+                                    <View style={styles.copiesContainer}>
+                                      <Text style={styles.copiesText}>
+                                        {item.copiesAvailable}
+                                      </Text>
+                                    </View>
                                   </View>
                                 </View>
-                              </View>
+                              </TouchableOpacity>
                             )}
                             showsHorizontalScrollIndicator={false}
                           />
@@ -219,6 +294,105 @@ const ShelfMiniMap = () => {
                   <TouchableOpacity
                     style={styles.closeButton}
                     onPress={() => setModalVisible(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+
+            <Modal
+              visible={bookModalVisible}
+              animationType="fade"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.bookInfoModal}>
+                  <Text style={styles.modalTitle}>📖 Book Details</Text>
+
+                  {selectedBook && (
+                    <ScrollView style={styles.bookDetailsContainer}>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Title: </Text>
+                        <Text style={styles.value}>{selectedBook.title}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Author: </Text>
+                        <Text style={styles.value}>{selectedBook.author}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Description: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.bookDescription}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Category: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.category}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}> Publisher:</Text>
+                        <Text style={styles.value}>
+                          {selectedBook.publisher}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Year: </Text>
+                        <Text style={styles.value}>{selectedBook.year}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>ISBN: </Text>
+                        <Text style={styles.value}>{selectedBook.isbn}</Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Total Copies: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.totalCopies}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Available Copies: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.copiesAvailable}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Shelf: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.shelfLocation}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Layer: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.layerNumber}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailRow}>
+                        <Text style={styles.label}>Department: </Text>
+                        <Text style={styles.value}>
+                          {selectedBook.department.join(", ")}
+                        </Text>
+                      </View>
+                    </ScrollView>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setBookModalVisible(false)}
                   >
                     <Text style={styles.closeButtonText}>Close</Text>
                   </TouchableOpacity>
@@ -243,43 +417,57 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginVertical: 20,
   },
-  searchInput: {
+  searchContainer: {
     width: "100%",
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 5,
-    marginBottom: 10,
-    fontSize: 16,
+    alignItems: "center",
+    marginBottom: 15,
   },
+
+  searchInput: {
+    width: "98%",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: "#d2691e",
+    borderRadius: 25,
+    fontSize: 16,
+    backgroundColor: "#FAF3E0",
+    shadowColor: "#000",
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    color: "#333",
+  },
+
   shelf: {
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
     width: "10%",
     height: "15%",
-    borderRadius: 10,
+    borderRadius: 5,
     borderWidth: 3,
-    borderColor: "#8b4513",
-    backgroundColor: "rgba(139, 69, 19, 0.9)",
+    borderColor: "gold",
+    backgroundColor: "#FEF9E1",
     overflow: "hidden",
   },
   shelfText: {
-    color: "white",
-    fontSize: width * 0.02,
+    color: "#6D2323",
+    fontSize: width * 0.03,
     fontWeight: "bold",
   },
   entrance: {
     position: "absolute",
     bottom: "10%",
     left: "73%",
-    backgroundColor: "red",
+    backgroundColor: "gold",
     padding: 5,
     borderRadius: 5,
   },
   entranceText: {
-    color: "white",
-    fontSize: width * 0.02,
+    color: "#6D2323",
+    fontSize: width * 0.04,
     fontWeight: "bold",
   },
   modalContainer: {
@@ -340,7 +528,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 5,
-    color: "#333",
+    color: "#fff",
   },
 
   bookSpine: {
@@ -375,7 +563,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   highlightedShelf: {
-    borderColor: "yellow",
+    borderColor: "#052814",
   },
 
   arrow: {
@@ -421,6 +609,84 @@ const styles = StyleSheet.create({
   copiesText: {
     color: "white",
     fontSize: 10,
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+
+  bookInfoModal: {
+    width: "85%",
+    height: "75%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 15,
+    borderBottomWidth: 2,
+    borderBottomColor: "#d2691e",
+    paddingBottom: 5,
+    color: "#8B4513",
+  },
+
+  bookDetailsContainer: {
+    maxHeight: "75%",
+    paddingVertical: 10,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    backgroundColor: "#FAF3E0",
+    borderRadius: 10,
+    shadowColor: "#8B4513",
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+
+  label: {
+    fontWeight: "bold",
+    color: "#8B4513",
+    fontSize: 16,
+    width: 100,
+    textAlign: "left",
+  },
+
+  value: {
+    color: "#333",
+    fontSize: 16,
+    flex: 1,
+    flexWrap: "wrap",
+  },
+
+  closeButton: {
+    marginTop: 15,
+    backgroundColor: "#d9534f",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+
+  closeButtonText: {
+    color: "white",
+    fontSize: 16,
     fontWeight: "bold",
   },
 });

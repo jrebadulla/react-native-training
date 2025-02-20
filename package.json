@@ -28,7 +28,8 @@
     "react-native-reanimated": "^3.16.7",
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.2.0",
-    "react-native-web": "~0.19.13"
+    "react-native-web": "~0.19.13",
+    "use-debounce": "^10.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
