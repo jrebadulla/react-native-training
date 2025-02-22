@@ -19,20 +19,20 @@ import {
 const { width, height } = Dimensions.get("window");
 
 const shelves = [
-  { id: "Outdated", top: "9%", left: "20%", width: "31%", height: "8%" },
-  { id: "1", top: "20%", left: "72%", width: "15%" },
-  { id: "2", top: "20%", left: "54%", width: "15%" },
+  { id: "Outdated", top: "9%", left: "19%", width: "32%", height: "8%" },
+  { id: "1", top: "20%", left: "70%", width: "15%" },
+  { id: "2", top: "20%", left: "53%", width: "15%" },
   { id: "3", top: "20%", left: "36%", width: "15%" },
   { id: "4", top: "20%", left: "19%", width: "15%" },
-  { id: "5", top: "38%", left: "89%", width: "15%" },
-  { id: "6", top: "20%", left: "89%", width: "15%" },
-  { id: "7", top: "9%", left: "55%", width: "31%", height: "8%" },
+  { id: "5", top: "38%", left: "87%", width: "15%" },
+  { id: "6", top: "20%", left: "87%", width: "15%" },
+  { id: "7", top: "9%", left: "53%", width: "32%", height: "8%" },
   { id: "8", top: "20%", left: "2%", width: "15%" },
   { id: "9", top: "38%", left: "2%", width: "15%" },
   { id: "10", top: "56%", left: "2%", width: "15%" },
   { id: "11", top: "74%", left: "2%", width: "15%" },
   { id: "12", top: "81%", left: "20%", width: "35%", height: "8%" },
-  { id: "13", top: "56%", left: "89%", width: "15%" },
+  { id: "13", top: "56%", left: "87%", width: "15%" },
 ];
 
 const ShelfMiniMap = () => {
@@ -45,6 +45,8 @@ const ShelfMiniMap = () => {
   const [highlightedBookId, setHighlightedBookId] = useState(null);
   const [selectedBook, setSelectedBook] = useState(null);
   const [bookModalVisible, setBookModalVisible] = useState(false);
+  const [readingBooks, setReadingBooks] = useState({});
+
   const flatListRef = useRef(null);
   const scrollViewRef = useRef(null);
 
@@ -153,7 +155,8 @@ const ShelfMiniMap = () => {
           }
         }, 500);
       } else {
-      ``}
+        ``;
+      }
     }
   }, [highlightedBookId, books, modalVisible, selectedShelf]);
 
@@ -186,6 +189,14 @@ const ShelfMiniMap = () => {
               value={searchTerm}
               onChangeText={(text) => setSearchTerm(text)}
             />
+            {searchTerm.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchTerm("")}
+                style={styles.clearButton}
+              >
+                <Text style={styles.clearButtonText}>✖</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.miniMapContainer}>
@@ -277,7 +288,11 @@ const ShelfMiniMap = () => {
                                     </Text>
                                     <View style={styles.copiesContainer}>
                                       <Text style={styles.copiesText}>
-                                        {item.copiesAvailable}
+                                        {Math.max(
+                                          item.copiesAvailable -
+                                            (readingBooks[item.id] || 0),
+                                          0
+                                        )}
                                       </Text>
                                     </View>
                                   </View>
@@ -309,7 +324,6 @@ const ShelfMiniMap = () => {
               <View style={styles.modalOverlay}>
                 <View style={styles.bookInfoModal}>
                   <Text style={styles.modalTitle}>📖 Book Details</Text>
-
                   {selectedBook && (
                     <ScrollView style={styles.bookDetailsContainer}>
                       <View style={styles.detailRow}>
@@ -337,7 +351,7 @@ const ShelfMiniMap = () => {
                       </View>
 
                       <View style={styles.detailRow}>
-                        <Text style={styles.label}> Publisher:</Text>
+                        <Text style={styles.label}>Publisher: </Text>
                         <Text style={styles.value}>
                           {selectedBook.publisher}
                         </Text>
@@ -363,7 +377,13 @@ const ShelfMiniMap = () => {
                       <View style={styles.detailRow}>
                         <Text style={styles.label}>Available Copies: </Text>
                         <Text style={styles.value}>
-                          {selectedBook.copiesAvailable}
+                          {selectedBook
+                            ? Math.max(
+                                selectedBook.copiesAvailable -
+                                  (readingBooks[selectedBook.id] || 0),
+                                0
+                              )
+                            : ""}
                         </Text>
                       </View>
 
@@ -386,6 +406,55 @@ const ShelfMiniMap = () => {
                         <Text style={styles.value}>
                           {selectedBook.department.join(", ")}
                         </Text>
+                      </View>
+
+                      {/* 🟢 Add Reading Buttons Below the Book Details */}
+                      <View style={{ marginTop: 20, alignItems: "center" }}>
+                        {readingBooks[selectedBook.id] === undefined ||
+                        readingBooks[selectedBook.id] <
+                          selectedBook.copiesAvailable ? (
+                          <TouchableOpacity
+                            style={styles.readButton}
+                            onPress={() => {
+                              setReadingBooks((prev) => ({
+                                ...prev,
+                                [selectedBook.id]:
+                                  (prev[selectedBook.id] || 0) + 1,
+                              }));
+                            }}
+                          >
+                            <Text style={styles.readButtonText}>
+                              📖 Start Reading
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <Text style={styles.noCopiesText}>
+                            ❌ No more copies available
+                          </Text>
+                        )}
+
+                        {readingBooks[selectedBook.id] > 0 && (
+                          <TouchableOpacity
+                            style={styles.finishButton}
+                            onPress={() => {
+                              setReadingBooks((prev) => {
+                                const updatedBooks = { ...prev };
+                                updatedBooks[selectedBook.id] = Math.max(
+                                  updatedBooks[selectedBook.id] - 1,
+                                  0
+                                );
+                                if (updatedBooks[selectedBook.id] === 0) {
+                                  delete updatedBooks[selectedBook.id];
+                                }
+                                return updatedBooks;
+                              });
+                            }}
+                          >
+                            <Text style={styles.finishButtonText}>
+                              ✅ Finish Reading
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </ScrollView>
                   )}
@@ -415,16 +484,18 @@ const styles = StyleSheet.create({
     padding: 10,
     position: "relative",
     alignSelf: "center",
-    marginVertical: 20,
   },
   searchContainer: {
+    flexDirection: "row",
     width: "100%",
     alignItems: "center",
-    marginBottom: 15,
+    position: "relative",
+    marginTop: 30,
   },
 
   searchInput: {
     width: "98%",
+    flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderWidth: 1,
@@ -603,7 +674,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     paddingHorizontal: 5,
     paddingVertical: 2,
-    borderRadius: 3,
+    borderRadius: 2,
   },
 
   copiesText: {
@@ -688,6 +759,58 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  clearButton: {
+    position: "absolute",
+    right: 15,
+    top: "45%",
+    transform: [{ translateY: -10 }],
+    borderRadius: 15,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearButtonText: {
+    fontSize: 15,
+    color: "#333",
+  },
+  readButton: {
+    backgroundColor: "#4CAF50",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "80%",
+    marginTop: 10,
+  },
+
+  readButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  finishButton: {
+    backgroundColor: "#FF5733",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "80%",
+    marginBottom: 10,
+    marginTop: 10,
+  },
+
+  finishButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  noCopiesText: {
+    color: "#FF0000",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginTop: 10,
   },
 });
 
