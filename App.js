@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#ffffff", // Match your app's theme or splash screen background color
+    backgroundColor: "#ffffff",
   },
 });

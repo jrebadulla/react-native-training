@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { db } from "./firebase.js";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  updateDoc,
+} from "firebase/firestore";
 import {
   View,
   Text,
@@ -14,25 +21,27 @@ import {
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 const { width, height } = Dimensions.get("window");
 
 const shelves = [
-  { id: "Outdated", top: "9%", left: "19%", width: "32%", height: "8%" },
-  { id: "1", top: "20%", left: "70%", width: "15%" },
-  { id: "2", top: "20%", left: "53%", width: "15%" },
-  { id: "3", top: "20%", left: "36%", width: "15%" },
-  { id: "4", top: "20%", left: "19%", width: "15%" },
-  { id: "5", top: "38%", left: "87%", width: "15%" },
-  { id: "6", top: "20%", left: "87%", width: "15%" },
-  { id: "7", top: "9%", left: "53%", width: "32%", height: "8%" },
-  { id: "8", top: "20%", left: "2%", width: "15%" },
-  { id: "9", top: "38%", left: "2%", width: "15%" },
-  { id: "10", top: "56%", left: "2%", width: "15%" },
-  { id: "11", top: "74%", left: "2%", width: "15%" },
-  { id: "12", top: "81%", left: "20%", width: "35%", height: "8%" },
-  { id: "13", top: "56%", left: "87%", width: "15%" },
+  { id: "Outdated", top: "5%", left: "19%", width: "32%", height: "8%" },
+  { id: "1", top: "16%", left: "70%", width: "15%" },
+  { id: "2", top: "16%", left: "53%", width: "15%" },
+  { id: "3", top: "16%", left: "36%", width: "15%" },
+  { id: "4", top: "16%", left: "19%", width: "15%" },
+  { id: "5", top: "34%", left: "87%", width: "15%" },
+  { id: "6", top: "16%", left: "87%", width: "15%" },
+  { id: "7", top: "5%", left: "53%", width: "32%", height: "8%" },
+  { id: "8", top: "16%", left: "2%", width: "15%" },
+  { id: "9", top: "34%", left: "2%", width: "15%" },
+  { id: "10", top: "52%", left: "2%", width: "15%" },
+  { id: "11", top: "70%", left: "2%", width: "15%" },
+  { id: "12", top: "77%", left: "20%", width: "35%", height: "8%" },
+  { id: "13", top: "52%", left: "87%", width: "15%" },
 ];
 
 const ShelfMiniMap = () => {
@@ -46,9 +55,198 @@ const ShelfMiniMap = () => {
   const [selectedBook, setSelectedBook] = useState(null);
   const [bookModalVisible, setBookModalVisible] = useState(false);
   const [readingBooks, setReadingBooks] = useState({});
+  const [finishModalVisible, setFinishModalVisible] = useState(false);
+  const [studentNumberInput, setStudentNumberInput] = useState("");
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [shelfNumbers, setShelfNumbers] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const flatListRef = useRef(null);
   const scrollViewRef = useRef(null);
+
+  const [formModalVisible, setFormModalVisible] = useState(false);
+  const [userInfo, setUserInfo] = useState({
+    fullName: "",
+    section: "",
+    yearLevel: "",
+    department: "",
+    studentNumber: "",
+    bookTitle: "",
+  });
+
+  const handleSubmit = async () => {
+    if (
+      !userInfo.fullName ||
+      !userInfo.section ||
+      !userInfo.yearLevel ||
+      !userInfo.department ||
+      !userInfo.studentNumber
+    ) {
+      alert("⚠️ Please fill in all fields before proceeding!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const bookRef = doc(db, "books", selectedBook.id);
+      const bookSnapshot = await getDoc(bookRef);
+      const bookData = bookSnapshot.data();
+
+      if (!bookData) {
+        alert("⚠️ Book not found!");
+        setLoading(false);
+        return;
+      }
+
+      let currentCopies =
+        books.find((b) => b.id === selectedBook.id)?.copiesAvailable || 0;
+
+      if (currentCopies >= 1) {
+        setBooks((prevBooks) =>
+          prevBooks.map((book) =>
+            book.id === selectedBook.id
+              ? { ...book, copiesAvailable: Math.max(currentCopies - 1, 0) }
+              : book
+          )
+        );
+
+        setSelectedBook((prev) => ({
+          ...prev,
+          copiesAvailable: Math.max(currentCopies - 1, 0),
+        }));
+
+        const sessionRef = await addDoc(collection(db, "reading_sessions"), {
+          ...userInfo,
+          timestamp: new Date(),
+          status: "Reading",
+        });
+
+        setReadingBooks((prev) => ({
+          ...prev,
+          [selectedBook.id]: (prev[selectedBook.id] || 0) + 1,
+        }));
+
+        alert("📖 Reading session started successfully!");
+
+        setUserInfo({
+          fullName: "",
+          section: "",
+          yearLevel: "",
+          department: "",
+          studentNumber: "",
+          bookTitle: "",
+        });
+
+        setFormModalVisible(false);
+      } else {
+        alert("⚠️ No copies available!");
+      }
+    } catch (error) {
+      alert("⚠️ Error starting session: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinishReading = async () => {
+    if (!selectedSession) {
+      alert("⚠️ Please select a book to finish!");
+      return;
+    }
+
+    try {
+      let updatedBooks = books.map((book) => {
+        if (book.title === selectedSession.bookTitle) {
+          let currentCopies = parseInt(book.copiesAvailable, 10) || 0;
+          let totalCopies = parseInt(book.totalCopies, 10) || 0;
+
+          let newCopiesAvailable = Math.min(currentCopies + 1, totalCopies);
+
+          return {
+            ...book,
+            copiesAvailable: newCopiesAvailable,
+          };
+        }
+        return book;
+      });
+
+      setBooks(updatedBooks);
+
+      const sessionRef = doc(db, "reading_sessions", selectedSession.id);
+      await updateDoc(sessionRef, {
+        status: "Done Reading",
+        finishedTimestamp: new Date(),
+      });
+
+      setActiveSessions((prevSessions) =>
+        prevSessions.filter((s) => s.id !== selectedSession.id)
+      );
+
+      setSelectedSession(null);
+
+      alert(`✅ Marked "${selectedSession.bookTitle}" as Done Reading!`);
+    } catch (error) {
+      alert("⚠️ Failed to update session: " + error.message);
+    }
+  };
+
+  const fetchActiveSessions = async () => {
+    if (!studentNumberInput.trim()) {
+      alert("⚠️ Please enter a Student Number!");
+      return;
+    }
+
+    try {
+      const querySnapshot = await getDocs(collection(db, "reading_sessions"));
+
+      querySnapshot.forEach((doc) => console.log(doc.data()));
+
+      let foundSessions = [];
+
+      querySnapshot.forEach((doc) => {
+        const sessionData = doc.data();
+        if (
+          sessionData.studentNumber.trim() === studentNumberInput.trim() &&
+          sessionData.status === "Reading"
+        ) {
+          foundSessions.push({ id: doc.id, ...sessionData });
+        }
+      });
+
+      if (foundSessions.length > 0) {
+        setActiveSessions(foundSessions);
+        setSelectedSession(null);
+      } else {
+        alert("⚠️ No active reading sessions found!");
+        setActiveSessions([]);
+        setSelectedSession(null);
+      }
+    } catch (error) {
+      alert("⚠️ Error fetching sessions: " + error.message);
+    }
+  };
+
+  useEffect(() => {
+    const fetchShelvesFromBooks = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "books"));
+        const booksData = querySnapshot.docs.map((doc) => doc.data());
+
+        const uniqueShelves = [
+          ...new Set(booksData.map((book) => book.shelfLocation)),
+        ];
+
+        const sortedShelves = uniqueShelves.sort(
+          (a, b) => parseInt(a) - parseInt(b)
+        );
+
+        setShelfNumbers(sortedShelves);
+      } catch (error) {}
+    };
+
+    fetchShelvesFromBooks();
+  }, []);
 
   useEffect(() => {
     if (searchTerm.trim() === "") {
@@ -102,12 +300,15 @@ const ShelfMiniMap = () => {
         const booksData = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
+          copiesAvailable: parseInt(doc.data().copiesAvailable, 10) || 0,
+          totalCopies: Number(doc.data().totalCopies) || 0,
           color: getRandomColor(),
         }));
 
         setBooks(booksData);
       } catch (error) {}
     };
+
     fetchBooks();
   }, []);
 
@@ -197,6 +398,42 @@ const ShelfMiniMap = () => {
                 <Text style={styles.clearButtonText}>✖</Text>
               </TouchableOpacity>
             )}
+          </View>
+          <View style={styles.finishReadingContainer}>
+            <View style={styles.pickerButtonWrapper}>
+              <Picker
+                selectedValue={selectedShelf}
+                style={styles.picker}
+                onValueChange={(itemValue) => {
+                  if (itemValue) {
+                    setSelectedShelf(itemValue);
+                    setModalVisible(true);
+                  }
+                }}
+                mode="dropdown"
+              >
+                <Picker.Item
+                  label="Select Shelf"
+                  value=""
+                  style={styles.pickerItem}
+                />
+                {shelfNumbers.map((shelf) => (
+                  <Picker.Item
+                    key={shelf}
+                    label={`Shelf ${shelf}`}
+                    value={shelf}
+                    style={styles.pickerItem}
+                  />
+                ))}
+              </Picker>
+            </View>
+
+            <TouchableOpacity
+              style={styles.finishButton}
+              onPress={() => setFinishModalVisible(true)}
+            >
+              <Text style={styles.finishButtonText}>✅ Finish Reading</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.miniMapContainer}>
@@ -288,11 +525,12 @@ const ShelfMiniMap = () => {
                                     </Text>
                                     <View style={styles.copiesContainer}>
                                       <Text style={styles.copiesText}>
-                                        {Math.max(
-                                          item.copiesAvailable -
-                                            (readingBooks[item.id] || 0),
-                                          0
-                                        )}
+                                        {item?.copiesAvailable !== undefined
+                                          ? Math.max(
+                                              Number(item.copiesAvailable),
+                                              0
+                                            )
+                                          : "N/A"}
                                       </Text>
                                     </View>
                                   </View>
@@ -377,13 +615,9 @@ const ShelfMiniMap = () => {
                       <View style={styles.detailRow}>
                         <Text style={styles.label}>Available Copies: </Text>
                         <Text style={styles.value}>
-                          {selectedBook
-                            ? Math.max(
-                                selectedBook.copiesAvailable -
-                                  (readingBooks[selectedBook.id] || 0),
-                                0
-                              )
-                            : ""}
+                          {selectedBook?.copiesAvailable !== undefined
+                            ? Math.max(Number(selectedBook.copiesAvailable), 0)
+                            : "N/A"}
                         </Text>
                       </View>
 
@@ -408,19 +642,17 @@ const ShelfMiniMap = () => {
                         </Text>
                       </View>
 
-                      {/* 🟢 Add Reading Buttons Below the Book Details */}
                       <View style={{ marginTop: 20, alignItems: "center" }}>
-                        {readingBooks[selectedBook.id] === undefined ||
-                        readingBooks[selectedBook.id] <
-                          selectedBook.copiesAvailable ? (
+                        {selectedBook?.copiesAvailable >= 1 ? (
                           <TouchableOpacity
                             style={styles.readButton}
                             onPress={() => {
-                              setReadingBooks((prev) => ({
+                              setUserInfo((prev) => ({
                                 ...prev,
-                                [selectedBook.id]:
-                                  (prev[selectedBook.id] || 0) + 1,
+                                bookTitle: selectedBook?.title || "",
                               }));
+
+                              setFormModalVisible(true);
                             }}
                           >
                             <Text style={styles.readButtonText}>
@@ -432,29 +664,6 @@ const ShelfMiniMap = () => {
                             ❌ No more copies available
                           </Text>
                         )}
-
-                        {readingBooks[selectedBook.id] > 0 && (
-                          <TouchableOpacity
-                            style={styles.finishButton}
-                            onPress={() => {
-                              setReadingBooks((prev) => {
-                                const updatedBooks = { ...prev };
-                                updatedBooks[selectedBook.id] = Math.max(
-                                  updatedBooks[selectedBook.id] - 1,
-                                  0
-                                );
-                                if (updatedBooks[selectedBook.id] === 0) {
-                                  delete updatedBooks[selectedBook.id];
-                                }
-                                return updatedBooks;
-                              });
-                            }}
-                          >
-                            <Text style={styles.finishButtonText}>
-                              ✅ Finish Reading
-                            </Text>
-                          </TouchableOpacity>
-                        )}
                       </View>
                     </ScrollView>
                   )}
@@ -464,6 +673,198 @@ const ShelfMiniMap = () => {
                     onPress={() => setBookModalVisible(false)}
                   >
                     <Text style={styles.closeButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+            <Modal
+              visible={formModalVisible}
+              animationType="slide"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.formModal}>
+                  <Text style={styles.modalTitle}>
+                    📋 Enter Your Information
+                  </Text>
+
+                  <ScrollView>
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Full Name:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Full Name"
+                        value={userInfo.fullName}
+                        onChangeText={(text) =>
+                          setUserInfo({ ...userInfo, fullName: text })
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Section:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Section"
+                        value={userInfo.section}
+                        onChangeText={(text) =>
+                          setUserInfo({ ...userInfo, section: text })
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Year Level:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Year Level"
+                        value={userInfo.yearLevel}
+                        onChangeText={(text) =>
+                          setUserInfo({ ...userInfo, yearLevel: text })
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Department:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter Department"
+                        value={userInfo.department}
+                        onChangeText={(text) =>
+                          setUserInfo({ ...userInfo, department: text })
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Student Number:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Ex: AY2021-00212"
+                        value={userInfo.studentNumber}
+                        onChangeText={(text) =>
+                          setUserInfo({ ...userInfo, studentNumber: text })
+                        }
+                      />
+                    </View>
+
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Selected Book:</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={userInfo.bookTitle}
+                        editable={false}
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        loading && { backgroundColor: "#ccc" },
+                      ]}
+                      onPress={handleSubmit}
+                      disabled={loading}
+                    >
+                      <Text style={styles.submitButtonText}>
+                        {loading
+                          ? "⏳ Processing..."
+                          : "Confirm & Start Reading"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.closeButton}
+                      onPress={() => setFormModalVisible(false)}
+                    >
+                      <Text style={styles.closeButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
+            <Modal
+              visible={finishModalVisible}
+              animationType="slide"
+              transparent={true}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.formModal}>
+                  <Text style={styles.modalTitle}>📋 Finish Reading</Text>
+
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Student Number:</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ex: AY2021-00213"
+                      value={studentNumberInput}
+                      onChangeText={(text) => setStudentNumberInput(text)}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.submitButton}
+                    onPress={fetchActiveSessions}
+                  >
+                    <Text style={styles.submitButtonText}>
+                      🔍 Find Sessions
+                    </Text>
+                  </TouchableOpacity>
+
+                  {activeSessions.length > 0 ? (
+                    <ScrollView style={styles.sessionListContainer}>
+                      <Text style={styles.sessionListTitle}>
+                        Active Reading Sessions:
+                      </Text>
+                      {activeSessions.map((session) => (
+                        <TouchableOpacity
+                          key={session.id}
+                          style={[
+                            styles.sessionItem,
+                            selectedSession?.id === session.id &&
+                              styles.selectedSessionItem,
+                          ]}
+                          onPress={() => setSelectedSession(session)}
+                        >
+                          <View style={styles.sessionDetails}>
+                            <Text style={styles.sessionBookTitle}>
+                              {session.bookTitle}
+                            </Text>
+                            <Text style={styles.sessionMeta}>
+                              📅{" "}
+                              {new Date(
+                                session.timestamp.seconds * 1000
+                              ).toLocaleString()}
+                            </Text>
+                            <Text style={styles.sessionMeta}>
+                              📍 {session.department}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  ) : (
+                    <Text style={styles.noSessionsText}>
+                      No active reading sessions found.
+                    </Text>
+                  )}
+
+                  {selectedSession && (
+                    <TouchableOpacity
+                      style={styles.finishButton}
+                      onPress={handleFinishReading}
+                    >
+                      <Text style={styles.finishButtonText}>
+                        ✅ Confirm Finish
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setFinishModalVisible(false)}
+                  >
+                    <Text style={styles.closeButtonText}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -530,7 +931,7 @@ const styles = StyleSheet.create({
   },
   entrance: {
     position: "absolute",
-    bottom: "10%",
+    bottom: "16%",
     left: "73%",
     backgroundColor: "gold",
     padding: 5,
@@ -736,7 +1137,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#8B4513",
     fontSize: 16,
-    width: 100,
+    width: 125,
     textAlign: "left",
   },
 
@@ -745,6 +1146,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     flex: 1,
     flexWrap: "wrap",
+    marginLeft: 5,
   },
 
   closeButton: {
@@ -781,7 +1183,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     width: "80%",
-    marginTop: 10,
   },
 
   readButtonText: {
@@ -810,6 +1211,172 @@ const styles = StyleSheet.create({
     color: "#FF0000",
     fontSize: 14,
     fontWeight: "bold",
+    marginTop: 10,
+  },
+  formModal: {
+    width: "85%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 4, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+
+  inputContainer: {
+    marginBottom: 12,
+  },
+
+  input: {
+    borderWidth: 1,
+    borderColor: "#d2691e",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: "#FAF3E0",
+  },
+
+  submitButton: {
+    backgroundColor: "#4CAF50",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  submitButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  closeButton: {
+    backgroundColor: "#d9534f",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  closeButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  sessionListContainer: {
+    maxHeight: 250,
+    marginTop: 10,
+    paddingHorizontal: 5,
+  },
+
+  sessionListTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 5,
+    color: "#8B4513",
+  },
+
+  sessionItem: {
+    backgroundColor: "#FAF3E0",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  selectedSessionItem: {
+    backgroundColor: "#FFD700",
+    borderColor: "#8B4513",
+    borderWidth: 2,
+  },
+
+  sessionDetails: {
+    flex: 1,
+  },
+
+  sessionBookTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#8B4513",
+  },
+
+  sessionMeta: {
+    fontSize: 12,
+    color: "#555",
+    marginTop: 3,
+  },
+
+  noSessionsText: {
+    color: "gray",
+    fontStyle: "italic",
+    marginTop: 10,
+    textAlign: "center",
+  },
+  pickerButtonWrapper: {
+    width: "90%",
+    maxWidth: 350,
+    height: 50,
+    borderWidth: 1,
+    borderColor: "#d2691e",
+    borderRadius: 10,
+    backgroundColor: "#FAF3E0",
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 5,
+    justifyContent: "center",
+  },
+
+  picker: {
+    height: 50,
+    width: "100%",
+    maxWidth: 350,
+    color: "#333",
+  },
+
+  pickerItem: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#6D2323",
+  },
+
+  finishButton: {
+    width: "90%",
+    maxWidth: 350,
+    height: 50,
+    backgroundColor: "#FF5733",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 10,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+
+  finishButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  finishReadingContainer: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    paddingHorizontal: 10,
     marginTop: 10,
   },
 });
