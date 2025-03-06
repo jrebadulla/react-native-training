@@ -10,7 +10,7 @@ import ShelfMiniMap from "./ShelfMiniMap";
 
 export default function PlatformSpecificApp() {
   const { width, height } = useWindowDimensions();
-  const isLandscape = width > height; // Detect landscape mode
+  const isLandscape = width > height; 
 
   return (
     <LinearGradient colors={["#6D2323", "#6D2323"]} style={styles.gradient}>
