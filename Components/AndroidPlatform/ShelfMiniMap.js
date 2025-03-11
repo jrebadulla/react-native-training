@@ -6,7 +6,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
+  query,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import {
   View,
@@ -61,6 +64,8 @@ const ShelfMiniMap = () => {
   const [selectedSession, setSelectedSession] = useState(null);
   const [shelfNumbers, setShelfNumbers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [autoFillSuccess, setAutoFillSuccess] = useState(false);
+  const [studentExists, setStudentExists] = useState(false);
 
   const flatListRef = useRef(null);
   const scrollViewRef = useRef(null);
@@ -139,6 +144,9 @@ const ShelfMiniMap = () => {
         });
 
         setFormModalVisible(false);
+        setBookModalVisible(false);
+        setModalVisible(false);
+        setFinishModalVisible(false);
       } else {
         alert("⚠️ No copies available!");
       }
@@ -207,7 +215,8 @@ const ShelfMiniMap = () => {
       querySnapshot.forEach((doc) => {
         const sessionData = doc.data();
         if (
-          sessionData.studentNumber.trim() === studentNumberInput.trim() &&
+          sessionData.studentNumber.trim().toUpperCase() ===
+            studentNumberInput.trim().toUpperCase() &&
           sessionData.status === "Reading"
         ) {
           foundSessions.push({ id: doc.id, ...sessionData });
@@ -226,26 +235,24 @@ const ShelfMiniMap = () => {
       alert("⚠️ Error fetching sessions: " + error.message);
     }
   };
-
   useEffect(() => {
-    const fetchShelvesFromBooks = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "books"));
-        const booksData = querySnapshot.docs.map((doc) => doc.data());
+    const booksCollection = collection(db, "books");
 
-        const uniqueShelves = [
-          ...new Set(booksData.map((book) => book.shelfLocation)),
-        ];
+    const unsubscribe = onSnapshot(booksCollection, (querySnapshot) => {
+      const booksData = querySnapshot.docs.map((doc) => doc.data());
 
-        const sortedShelves = uniqueShelves.sort(
-          (a, b) => parseInt(a) - parseInt(b)
-        );
+      const uniqueShelves = [
+        ...new Set(booksData.map((book) => book.shelfLocation)),
+      ];
 
-        setShelfNumbers(sortedShelves);
-      } catch (error) {}
-    };
+      const sortedShelves = uniqueShelves.sort(
+        (a, b) => parseInt(a) - parseInt(b)
+      );
 
-    fetchShelvesFromBooks();
+      setShelfNumbers(sortedShelves);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -256,8 +263,11 @@ const ShelfMiniMap = () => {
       return;
     }
 
-    const foundBook = books.find((book) =>
-      book.title.toLowerCase().includes(searchTerm.toLowerCase())
+    const foundBook = books.find(
+      (book) =>
+        book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        book.category.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (foundBook) {
@@ -292,24 +302,20 @@ const ShelfMiniMap = () => {
   );
 
   useEffect(() => {
-    const fetchBooks = async () => {
-      try {
-        const booksCollection = collection(db, "books");
-        const querySnapshot = await getDocs(booksCollection);
+    const booksCollection = collection(db, "books");
 
-        const booksData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-          copiesAvailable: parseInt(doc.data().copiesAvailable, 10) || 0,
-          totalCopies: Number(doc.data().totalCopies) || 0,
-          color: getRandomColor(),
-        }));
+    const unsubscribe = onSnapshot(booksCollection, (querySnapshot) => {
+      const booksData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        copiesAvailable: parseInt(doc.data().copiesAvailable, 10) || 0,
+        totalCopies: Number(doc.data().totalCopies) || 0,
+        color: getRandomColor(),
+      }));
+      setBooks(booksData);
+    });
 
-        setBooks(booksData);
-      } catch (error) {}
-    };
-
-    fetchBooks();
+    return () => unsubscribe();
   }, []);
 
   const getRandomColor = () => {
@@ -377,6 +383,69 @@ const ShelfMiniMap = () => {
       }
     }
   }, [highlightedLayer, booksInSelectedShelf, modalVisible]);
+
+  const autoFillUserData = async () => {
+    const formattedStudentNumber = userInfo.studentNumber.trim().toUpperCase();
+
+    if (!formattedStudentNumber) return;
+
+    try {
+      const q = query(
+        collection(db, "reading_sessions"),
+        where("studentNumber", "==", formattedStudentNumber)
+      );
+      const querySnapshot = await getDocs(q);
+
+      const matchingSessions = querySnapshot.docs;
+      if (matchingSessions.length > 0) {
+        const data = matchingSessions[0].data();
+        setUserInfo((prev) => ({
+          ...prev,
+          fullName: data.fullName || prev.fullName,
+          section: data.section || prev.section,
+          yearLevel: data.yearLevel || prev.yearLevel,
+          department: data.department || prev.department,
+        }));
+        setAutoFillSuccess(true);
+      } else {
+        setAutoFillSuccess(false);
+      }
+    } catch (error) {}
+  };
+
+  const checkStudentExists = async () => {
+    const formattedStudentNumber = userInfo.studentNumber.trim().toUpperCase();
+    if (!formattedStudentNumber) {
+      setStudentExists(false);
+      return;
+    }
+    try {
+      const q = query(
+        collection(db, "reading_sessions"),
+        where("studentNumber", "==", formattedStudentNumber)
+      );
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.docs.length > 0) {
+        setStudentExists(true);
+      } else {
+        setStudentExists(false);
+      }
+    } catch (error) {
+      setStudentExists(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userInfo.studentNumber.trim() !== "") {
+      const delayDebounceFn = setTimeout(() => {
+        checkStudentExists();
+      }, 500);
+
+      return () => clearTimeout(delayDebounceFn);
+    } else {
+      setStudentExists(false);
+    }
+  }, [userInfo.studentNumber]);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -690,6 +759,43 @@ const ShelfMiniMap = () => {
 
                   <ScrollView>
                     <View style={styles.inputContainer}>
+                      <Text style={styles.label}>Student Number:</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Ex: AY2021-00212"
+                        value={userInfo.studentNumber}
+                        onChangeText={(text) => {
+                          setUserInfo({ ...userInfo, studentNumber: text });
+
+                          setAutoFillSuccess(false);
+                          setStudentExists(false);
+                        }}
+                        onEndEditing={checkStudentExists}
+                      />
+
+                      {studentExists && (
+                        <TouchableOpacity
+                          style={[
+                            styles.loadDataButton,
+                            autoFillSuccess && styles.loadDataButtonSuccess,
+                          ]}
+                          onPress={autoFillUserData}
+                          disabled={autoFillSuccess}
+                        >
+                          <Text
+                            style={[
+                              styles.loadDataButtonText,
+                              autoFillSuccess &&
+                                styles.loadDataButtonTextSuccess,
+                            ]}
+                          >
+                            {autoFillSuccess ? "Got it!" : "Show My Info"}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <View style={styles.inputContainer}>
                       <Text style={styles.label}>Full Name:</Text>
                       <TextInput
                         style={styles.input}
@@ -738,18 +844,6 @@ const ShelfMiniMap = () => {
                     </View>
 
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Student Number:</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Ex: AY2021-00212"
-                        value={userInfo.studentNumber}
-                        onChangeText={(text) =>
-                          setUserInfo({ ...userInfo, studentNumber: text })
-                        }
-                      />
-                    </View>
-
-                    <View style={styles.inputContainer}>
                       <Text style={styles.label}>Selected Book:</Text>
                       <TextInput
                         style={styles.input}
@@ -775,7 +869,18 @@ const ShelfMiniMap = () => {
 
                     <TouchableOpacity
                       style={styles.closeButton}
-                      onPress={() => setFormModalVisible(false)}
+                      onPress={() => {
+                        setUserInfo({
+                          fullName: "",
+                          section: "",
+                          yearLevel: "",
+                          department: "",
+                          studentNumber: "",
+                          bookTitle: "",
+                        });
+                        setAutoFillSuccess(false);
+                        setFormModalVisible(false);
+                      }}
                     >
                       <Text style={styles.closeButtonText}>Cancel</Text>
                     </TouchableOpacity>
@@ -851,10 +956,10 @@ const ShelfMiniMap = () => {
 
                   {selectedSession && (
                     <TouchableOpacity
-                      style={styles.finishButton}
+                      style={styles.finishButtonConfirm}
                       onPress={handleFinishReading}
                     >
-                      <Text style={styles.finishButtonText}>
+                      <Text style={styles.finishButtonTextConfirm}>
                         ✅ Confirm Finish
                       </Text>
                     </TouchableOpacity>
@@ -862,7 +967,11 @@ const ShelfMiniMap = () => {
 
                   <TouchableOpacity
                     style={styles.closeButton}
-                    onPress={() => setFinishModalVisible(false)}
+                    onPress={() => {
+                      setStudentNumberInput("");
+                      setActiveSessions([]);
+                      setFinishModalVisible(false);
+                    }}
                   >
                     <Text style={styles.closeButtonText}>Cancel</Text>
                   </TouchableOpacity>
@@ -891,7 +1000,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     position: "relative",
-    marginTop: 30,
+    marginTop: 0,
   },
 
   searchInput: {
@@ -1191,17 +1300,17 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
-  finishButton: {
+  finishButtonConfirm: {
     backgroundColor: "#FF5733",
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
-    width: "80%",
+    width: "100%",
     marginBottom: 10,
     marginTop: 10,
   },
 
-  finishButtonText: {
+  finishButtonTextConfirm: {
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
@@ -1378,6 +1487,24 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 10,
     marginTop: 10,
+  },
+  loadDataButton: {
+    marginTop: 10,
+    backgroundColor: "#007BFF",
+    paddingVertical: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  loadDataButtonSuccess: {
+    backgroundColor: "transparent",
+  },
+  loadDataButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  loadDataButtonTextSuccess: {
+    color: "green",
   },
 });
 
