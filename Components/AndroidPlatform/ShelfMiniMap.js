@@ -263,12 +263,22 @@ const ShelfMiniMap = () => {
       return;
     }
 
-    const foundBook = books.find(
-      (book) =>
-        book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        book.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const foundBook = books.find((book) => {
+      const search = searchTerm.toLowerCase();
+
+      const titleMatch = book.title?.toLowerCase().includes(search);
+      const authorMatch = book.author?.toLowerCase().includes(search);
+
+      const categoryMatch = Array.isArray(book.category)
+        ? book.category.some(
+            (cat) =>
+              typeof cat === "string" && cat.toLowerCase().includes(search)
+          )
+        : typeof book.category === "string" &&
+          book.category.toLowerCase().includes(search);
+
+      return titleMatch || authorMatch || categoryMatch;
+    });
 
     if (foundBook) {
       setHighlightedShelf(foundBook.shelfLocation);
