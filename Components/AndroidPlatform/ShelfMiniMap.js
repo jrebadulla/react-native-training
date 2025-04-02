@@ -67,6 +67,39 @@ const ShelfMiniMap = () => {
   const [autoFillSuccess, setAutoFillSuccess] = useState(false);
   const [studentExists, setStudentExists] = useState(false);
 
+  const getTopCategoryByShelf = () => {
+    const shelfCategoryMap = {};
+
+    books.forEach((book) => {
+      const shelf = book.shelfLocation;
+      const category = book.category;
+
+      if (!shelf || !category) return;
+
+      if (!shelfCategoryMap[shelf]) {
+        shelfCategoryMap[shelf] = {};
+      }
+
+      const categoryKey = Array.isArray(category) ? category[0] : category;
+
+      shelfCategoryMap[shelf][categoryKey] =
+        (shelfCategoryMap[shelf][categoryKey] || 0) + 1;
+    });
+
+    const result = {};
+    for (const shelf in shelfCategoryMap) {
+      const categories = shelfCategoryMap[shelf];
+      const topCategory = Object.entries(categories).sort(
+        (a, b) => b[1] - a[1]
+      )[0];
+      result[shelf] = topCategory ? topCategory[0] : "Uncategorized";
+    }
+
+    return result;
+  };
+
+  const topCategories = useMemo(() => getTopCategoryByShelf(), [books]);
+
   const flatListRef = useRef(null);
   const scrollViewRef = useRef(null);
 
@@ -104,6 +137,23 @@ const ShelfMiniMap = () => {
         return;
       }
 
+      const q = query(
+        collection(db, "reading_sessions"),
+        where("studentNumber", "==", userInfo.studentNumber.trim()),
+        where("bookTitle", "==", selectedBook?.title),
+        where("status", "==", "Reading")
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        alert(
+          "⚠️ You are already reading this book. Reading the same book at the same time is not allowed."
+        );
+
+        setLoading(false);
+        return;
+      }
+
       let currentCopies =
         books.find((b) => b.id === selectedBook.id)?.copiesAvailable || 0;
 
@@ -120,6 +170,23 @@ const ShelfMiniMap = () => {
           ...prev,
           copiesAvailable: Math.max(currentCopies - 1, 0),
         }));
+
+        const q = query(
+          collection(db, "reading_sessions"),
+          where("studentNumber", "==", userInfo.studentNumber.trim()),
+          where("bookTitle", "==", selectedBook?.title),
+          where("status", "==", "Reading")
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          alert(
+            "⚠️ You are already reading this book. Reading the same book at the same time is not allowed."
+          );
+
+          setLoading(false);
+          return;
+        }
 
         const sessionRef = await addDoc(collection(db, "reading_sessions"), {
           ...userInfo,
@@ -530,6 +597,9 @@ const ShelfMiniMap = () => {
                 }}
               >
                 <Text style={styles.shelfText}>Shelf {shelf.id}</Text>
+                <Text style={styles.categoryLabel}>
+                  {topCategories[shelf.id] || "N/A"}
+                </Text>
 
                 {highlightedShelf === shelf.id && (
                   <Text style={styles.arrow}>👇</Text>
@@ -828,29 +898,77 @@ const ShelfMiniMap = () => {
                         }
                       />
                     </View>
-
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Year Level:</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter Year Level"
-                        value={userInfo.yearLevel}
-                        onChangeText={(text) =>
-                          setUserInfo({ ...userInfo, yearLevel: text })
-                        }
-                      />
+                      <View style={styles.pickerButtonWrapper}>
+                        <Picker
+                          selectedValue={userInfo.yearLevel}
+                          onValueChange={(itemValue) =>
+                            setUserInfo({ ...userInfo, yearLevel: itemValue })
+                          }
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="Select Year Level" value="" />
+                          <Picker.Item label="First Year" value="1st Year" />
+                          <Picker.Item label="Second Year" value="2nd Year" />
+                          <Picker.Item label="Third Year" value="3rd Year" />
+                          <Picker.Item label="Fourth Year" value="4th Year" />
+                        </Picker>
+                      </View>
                     </View>
-
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Department:</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Enter Department"
-                        value={userInfo.department}
-                        onChangeText={(text) =>
-                          setUserInfo({ ...userInfo, department: text })
-                        }
-                      />
+                      <View style={styles.pickerButtonWrapper}>
+                        <Picker
+                          selectedValue={userInfo.department}
+                          onValueChange={(itemValue) =>
+                            setUserInfo({ ...userInfo, department: itemValue })
+                          }
+                          style={styles.picker}
+                        >
+                          <Picker.Item label="Select Department" value="" />
+                          <Picker.Item
+                            label="BS in Accountancy / AIS"
+                            value="Bachelor of Science in Accountancy / Accounting Information System"
+                          />
+                          <Picker.Item
+                            label="BS in Psychology"
+                            value="Bachelor of Science in Psychology"
+                          />
+                          <Picker.Item
+                            label="BS in Hospitality Mgmt"
+                            value="Bachelor of Science in Hospitality Management"
+                          />
+                          <Picker.Item
+                            label="BS in Info Tech"
+                            value="Bachelor of Science in Information Technology"
+                          />
+                          <Picker.Item
+                            label="BS in Tourism Mgmt"
+                            value="Bachelor of Science in Tourism Management"
+                          />
+                          <Picker.Item
+                            label="BS in Criminology"
+                            value="Bachelor of Science in Criminology"
+                          />
+                          <Picker.Item
+                            label="BS in Business Admin"
+                            value="Bachelor of Science in Business Administration"
+                          />
+                          <Picker.Item
+                            label="BS in Elem Education"
+                            value="Bachelor of Science in Elementary Education"
+                          />
+                          <Picker.Item
+                            label="BS in Physical Education"
+                            value="Bachelor of Science in Physical Education"
+                          />
+                          <Picker.Item
+                            label="BS in Secondary Education"
+                            value="Bachelor of Science in Secondary Education"
+                          />
+                        </Picker>
+                      </View>
                     </View>
 
                     <View style={styles.inputContainer}>
@@ -1440,7 +1558,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   pickerButtonWrapper: {
-    width: "90%",
+    width: "100%",
     maxWidth: 350,
     height: 50,
     borderWidth: 1,
@@ -1515,6 +1633,13 @@ const styles = StyleSheet.create({
   },
   loadDataButtonTextSuccess: {
     color: "green",
+  },
+  categoryLabel: {
+    fontSize: width * 0.025,
+    color: "#444",
+    textAlign: "center",
+    marginTop: 2,
+    fontStyle: "italic",
   },
 });
 
